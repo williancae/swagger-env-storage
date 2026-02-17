@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swagger Environment Variables</title>
+  <link rel="stylesheet" href="../styles/base.css">
+</head>
+<body class="min-w-[400px] w-[450px]">
+  <div id="app" class="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+          </svg>
+          <h1 class="text-base font-semibold text-gray-900 dark:text-white">Environment Variables</h1>
+        </div>
+        <div id="status-indicator" class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <span class="text-xs text-gray-600 dark:text-gray-400" id="status-text">Active</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Quick Toggle -->
+    <div id="toggle-container" class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <!-- Toggle component will be inserted here -->
+    </div>
+
+    <!-- Search Bar -->
+    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Search variables..."
+          class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+        />
+      </div>
+    </div>
+
+    <!-- Quick Add Variable -->
+    <div id="quick-add" class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <button
+        type="button"
+        id="quick-add-trigger"
+        class="quick-add-trigger w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 text-sm font-medium"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Adicionar variável
+      </button>
+      <div id="quick-add-form" class="quick-add-form grid grid-rows-[0fr] overflow-hidden" aria-hidden="true">
+        <div class="min-h-0">
+          <div class="flex gap-2 items-end pt-3">
+            <div class="flex-1 min-w-0 space-y-1">
+              <input
+                type="text"
+                id="quick-add-key"
+                placeholder="Key (ex: apiKey)"
+                maxlength="50"
+                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+              />
+              <input
+                type="text"
+                id="quick-add-value"
+                placeholder="Value"
+                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+              />
+            </div>
+            <div class="flex flex-shrink-0 gap-1">
+              <button
+                type="button"
+                id="quick-add-cancel"
+                class="p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150"
+                title="Cancelar"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+              <button
+                type="button"
+                id="quick-add-btn"
+                class="p-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-150"
+                title="Salvar"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <p id="quick-add-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400 hidden"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variables List -->
+    <div id="variables-list" class="flex-1 overflow-y-auto p-4 space-y-2">
+      <!-- Variable list component will be inserted here -->
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 space-y-2">
+      <p id="shortcut-hint" class="text-center text-xs text-gray-500 dark:text-gray-400"></p>
+      <button
+        id="open-options"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        Manage Variables
+      </button>
+    </footer>
+  </div>
+
+  <script type="module" src="./popup.ts"></script>
+</body>
+</html>

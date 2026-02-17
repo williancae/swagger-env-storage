@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Swagger Environment Variables"
+  },
+  "extDescription": {
+    "message": "Manage and auto-replace environment variables in web forms"
+  }
+}

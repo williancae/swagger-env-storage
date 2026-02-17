@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.quick-add-form {
+  transition: grid-template-rows 0.2s ease-out;
+}
+.quick-add-form.quick-add-form--open {
+  grid-template-rows: 1fr;
+}
+
+/* Pre-filled input animation */
+@keyframes pre-fill-fade {
+  0% {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+input.pre-filled {
+  animation: pre-fill-fade 1.5s ease-out;
+}
