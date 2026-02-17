@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/schema/mcp-config-schema.json",
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/sequential-thinking-mcp-server"],
+      "env": {},
+      "disabled": false,
+      "timeout": 30000
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@context7/mcp-server-context7"],
+      "env": {},
+      "disabled": false
+    },
+    "mcp-mermaid": {
+      "command": "npx",
+      "args": ["-y", "mcp-mermaid"],
+      "env": {},
+      "disabled": true
+    },
+    "imageFetch": {
+      "command": "npx",
+      "args": ["-y", "image-fetch-mcp-server"],
+      "env": {},
+      "disabled": true
+    }
+  }
+}

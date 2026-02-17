@@ -5,6 +5,7 @@
 
 import { StorageService } from '@/shared/storage';
 import type { Variable } from '@/shared/types';
+import { runMigrations } from '@/shared/migration';
 
 const storage = StorageService.getInstance();
 
@@ -85,6 +86,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       '[Service Worker] Extensão atualizada para versão:',
       chrome.runtime.getManifest().version
     );
+    const currentData = await storage.getData();
+    const migratedData = await runMigrations(currentData);
+    await storage.setData(migratedData);
+    console.log('[Service Worker] Migrations executadas, versão:', migratedData.version);
     await setupContextMenu();
   }
 });

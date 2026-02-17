@@ -8,6 +8,7 @@ export interface Variable {
   value: string;
   description?: string;
   enabled: boolean;
+  hosts: string[];
   createdAt: string;
   updatedAt: string;
 }

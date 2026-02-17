@@ -11,6 +11,8 @@ import {
   MAX_VARIABLE_VALUE_LENGTH
 } from './constants';
 import { generateId, getCurrentTimestamp, validateVariableKey } from './utils';
+import { validateHostPattern } from './host-utils';
+import { runMigrations } from './migration';
 
 /**
  * Error class for storage-related errors
@@ -70,11 +72,21 @@ export class StorageService {
 
     const result = await chrome.storage.local.get(null);
     const rawSettings = (result.settings as Partial<Settings> | undefined) || {};
-    const data: StorageData = {
+    const rawVariables = ((result.variables as Variable[]) || []).map((v) => ({
+      ...v,
+      hosts: v.hosts ?? [],
+    }));
+    let data: StorageData = {
       version: (result.version as string) || STORAGE_VERSION,
-      variables: (result.variables as Variable[]) || [],
+      variables: rawVariables,
       settings: { ...DEFAULT_SETTINGS, ...rawSettings },
     };
+
+    // Run migrations if version is outdated
+    if (data.version !== STORAGE_VERSION) {
+      data = await runMigrations(data);
+      await chrome.storage.local.set(data);
+    }
 
     this.cache = data;
     this.cacheTimestamp = now;
@@ -146,6 +158,19 @@ export class StorageService {
         'VALUE_TOO_LONG'
       );
     }
+
+    // Validate hosts if provided
+    if (variable.hosts && Array.isArray(variable.hosts)) {
+      for (const host of variable.hosts) {
+        const hostError = validateHostPattern(host);
+        if (hostError) {
+          throw new StorageError(
+            `Host inválido "${host}": ${hostError}`,
+            'INVALID_HOST_PATTERN'
+          );
+        }
+      }
+    }
   }
 
   /**
@@ -186,6 +211,7 @@ export class StorageService {
         value: variable.value || '',
         description: variable.description,
         enabled: variable.enabled !== undefined ? variable.enabled : true,
+        hosts: variable.hosts ?? [],
         createdAt: now,
         updatedAt: now,
       };
@@ -294,6 +320,7 @@ export class StorageService {
           value: v.value || '',
           description: v.description,
           enabled: v.enabled !== undefined ? v.enabled : true,
+          hosts: v.hosts ?? [],
           createdAt: v.createdAt || now,
           updatedAt: now,
         });

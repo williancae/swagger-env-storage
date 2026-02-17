@@ -5,11 +5,13 @@
 import { StorageService, StorageError } from '@/shared/storage';
 import type { Variable, Settings, ThemeMode } from '@/shared/types';
 import { applyTheme } from '@/shared/utils';
+import { validateHostPattern } from '@/shared/host-utils';
 
 const storage = StorageService.getInstance();
 let currentVariables: Variable[] = [];
 let currentSearchQuery = '';
 let editingVariable: Variable | null = null;
+let modalHosts: string[] = [];
 
 async function init(): Promise<void> {
   console.log('[Options] Initializing...');
@@ -121,11 +123,13 @@ function renderVariablesTable(variables: Variable[]): void {
     countEl.textContent = `(${variables.length})`;
   }
 
+  const query = currentSearchQuery.toLowerCase();
   const filteredVars = currentSearchQuery
     ? variables.filter(v =>
-        v.key.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
-        v.value.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
-        (v.description?.toLowerCase().includes(currentSearchQuery.toLowerCase()) || false)
+        v.key.toLowerCase().includes(query) ||
+        v.value.toLowerCase().includes(query) ||
+        (v.description?.toLowerCase().includes(query) || false) ||
+        (v.hosts?.some(h => h.toLowerCase().includes(query)) || false)
       )
     : variables;
 
@@ -164,6 +168,7 @@ function renderVariablesTable(variables: Variable[]): void {
           <th class="px-4 py-3">Key</th>
           <th class="px-4 py-3">Value</th>
           <th class="px-4 py-3">Description</th>
+          <th class="px-4 py-3">Hosts</th>
           <th class="px-4 py-3 text-center">Status</th>
           <th class="px-4 py-3 text-right">Actions</th>
         </tr>
@@ -186,6 +191,12 @@ function renderVariablesTable(variables: Variable[]): void {
             </td>
             <td class="px-4 py-3">
               <span class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs block">${v.description ? escapeHtml(v.description) : '-'}</span>
+            </td>
+            <td class="px-4 py-3">
+              ${!v.hosts || v.hosts.length === 0
+                ? '<span class="text-xs text-gray-400 dark:text-gray-500 italic">(global)</span>'
+                : `<div class="flex flex-wrap gap-1">${v.hosts.map(h => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">${escapeHtml(h)}</span>`).join('')}</div>`
+              }
             </td>
             <td class="px-4 py-3 text-center">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${v.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
@@ -430,6 +441,23 @@ function showAddVariableModal(): void {
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Host Patterns</label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Restrict this variable to specific hosts. Leave empty for global access.</p>
+            <div id="hosts-chips" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px]"></div>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                id="host-input"
+                placeholder="e.g. api.example.com or *"
+                class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <button type="button" id="add-host-btn" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg font-medium transition-colors whitespace-nowrap">
+                Add Host
+              </button>
+            </div>
+            <div id="host-error" class="hidden text-xs text-red-600 dark:text-red-400 mt-1"></div>
+          </div>
           <div class="flex items-center gap-2">
             <input type="checkbox" id="var-enabled" ${!isEdit || editingVariable!.enabled ? 'checked' : ''} class="w-4 h-4 text-blue-600 focus:ring-blue-500 rounded">
             <label for="var-enabled" class="text-sm text-gray-700 dark:text-gray-300">Enabled</label>
@@ -452,6 +480,20 @@ function showAddVariableModal(): void {
   modal.querySelector('#cancel-btn')?.addEventListener('click', closeModal);
   modal.querySelector('#save-btn')?.addEventListener('click', saveVariable);
 
+  // Initialize hosts chips
+  modalHosts = isEdit && editingVariable!.hosts ? [...editingVariable!.hosts] : [];
+  renderHostChips();
+
+  modal.querySelector('#add-host-btn')?.addEventListener('click', addHostFromInput);
+
+  const hostInput = modal.querySelector('#host-input') as HTMLInputElement;
+  hostInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addHostFromInput();
+    }
+  });
+
   setTimeout(() => {
     if (!isEdit) {
       (modal.querySelector('#var-key') as HTMLInputElement)?.focus();
@@ -459,6 +501,68 @@ function showAddVariableModal(): void {
       (modal.querySelector('#var-value') as HTMLTextAreaElement)?.focus();
     }
   }, 100);
+}
+
+function addHostFromInput(): void {
+  const input = document.getElementById('host-input') as HTMLInputElement;
+  const errorDiv = document.getElementById('host-error');
+  if (!input || !errorDiv) return;
+
+  const value = input.value.trim();
+  if (!value) return;
+
+  const error = validateHostPattern(value);
+  if (error) {
+    errorDiv.textContent = error;
+    errorDiv.classList.remove('hidden');
+    return;
+  }
+
+  if (modalHosts.includes(value)) {
+    errorDiv.textContent = 'Este host já foi adicionado';
+    errorDiv.classList.remove('hidden');
+    return;
+  }
+
+  errorDiv.classList.add('hidden');
+  modalHosts.push(value);
+  input.value = '';
+  renderHostChips();
+  input.focus();
+}
+
+function removeHost(index: number): void {
+  modalHosts.splice(index, 1);
+  renderHostChips();
+}
+
+function renderHostChips(): void {
+  const container = document.getElementById('hosts-chips');
+  if (!container) return;
+
+  if (modalHosts.length === 0) {
+    container.innerHTML = '<span class="text-xs text-gray-400 dark:text-gray-500 italic py-1">(global - applies to all hosts)</span>';
+    return;
+  }
+
+  container.innerHTML = modalHosts.map((host, i) => `
+    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+      ${escapeHtml(host)}
+      <button type="button" class="remove-host-btn hover:text-purple-600 dark:hover:text-purple-300 ml-0.5" data-index="${i}" title="Remove">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </span>
+  `).join('');
+
+  container.querySelectorAll('.remove-host-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const index = parseInt((btn as HTMLElement).dataset.index || '0', 10);
+      removeHost(index);
+    });
+  });
 }
 
 function showImportConfirm(merge: boolean): void {
@@ -485,6 +589,7 @@ async function saveVariable(): Promise<void> {
       value,
       description: description || undefined,
       enabled,
+      hosts: [...modalHosts],
     };
 
     if (editingVariable) {
@@ -594,6 +699,7 @@ function closeModal(): void {
     modal.innerHTML = '';
   }
   editingVariable = null;
+  modalHosts = [];
 }
 
 function showToast(message: string, type: 'success' | 'error' = 'success'): void {

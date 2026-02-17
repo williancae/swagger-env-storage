@@ -5,15 +5,32 @@
 import { StorageService, StorageError } from '@/shared/storage';
 import type { Variable } from '@/shared/types';
 import { validateVariableKey, getOpenPopupShortcutLabel, applyTheme } from '@/shared/utils';
+import { isGlobalVariable, filterVariablesByHost, formatHostDisplay, matchHost } from '@/shared/host-utils';
 import { MAX_VARIABLE_NAME_LENGTH, MAX_VARIABLE_VALUE_LENGTH } from '@/shared/constants';
 
 const storage = StorageService.getInstance();
 let currentVariables: Variable[] = [];
 let currentSearchQuery = '';
+let currentHost = '';
+let currentHostname = '';
+let currentPort = '';
 const showValues = false;
 
 async function init(): Promise<void> {
   console.log('[Popup] Initializing...');
+
+  // Detect current host from active tab
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.url) {
+      const url = new URL(tab.url);
+      currentHostname = url.hostname;
+      currentPort = url.port;
+      currentHost = formatHostDisplay(currentHostname, currentPort);
+    }
+  } catch (err) {
+    console.log('[Popup] Could not detect host:', err);
+  }
 
   // Load data
   currentVariables = await storage.getVariables();
@@ -22,6 +39,7 @@ async function init(): Promise<void> {
   applyTheme(settings.theme ?? 'light');
 
   // Render UI
+  renderHostIndicator(currentHost);
   renderVariablesList(currentVariables);
   renderToggle(settings.enabled);
   updateStatusIndicator(settings.enabled);
@@ -37,6 +55,43 @@ async function init(): Promise<void> {
   });
 
   console.log('[Popup] Ready');
+}
+
+function renderHostIndicator(host: string): void {
+  const container = document.getElementById('current-host');
+  if (!container) return;
+
+  if (!host) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  const activeCount = filterVariablesByHost(currentVariables, currentHostname, currentPort)
+    .filter(v => v.enabled).length;
+  const totalCount = currentVariables.length;
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+        </svg>
+        <span class="text-xs font-mono text-gray-700 dark:text-gray-300 truncate max-w-[200px]" title="${escapeHtml(host)}">${escapeHtml(host)}</span>
+      </div>
+      <span class="text-xs px-1.5 py-0.5 rounded-full ${activeCount > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}">
+        ${activeCount}/${totalCount} active
+      </span>
+    </div>
+  `;
+
+  // Show host name in quick-add checkbox
+  const hostLabel = document.getElementById('quick-add-host-label');
+  const hostName = document.getElementById('quick-add-host-name');
+  if (hostLabel && hostName) {
+    hostLabel.classList.remove('hidden');
+    hostLabel.classList.add('flex');
+    hostName.textContent = host;
+  }
 }
 
 function renderVariablesList(variables: Variable[]): void {
@@ -73,12 +128,28 @@ function renderVariablesList(variables: Variable[]): void {
   list.className = 'space-y-2';
 
   filteredVars.forEach((variable) => {
+    const isGlobal = isGlobalVariable(variable);
+    const isActiveOnHost = currentHost
+      ? isGlobal || variable.hosts.some(h => matchHost(h, currentHostname, currentPort))
+      : true;
+
     const item = document.createElement('div');
     item.className = `
       bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700
       hover:shadow-md transition-shadow duration-150 cursor-pointer group
       ${!variable.enabled ? 'opacity-50' : ''}
+      ${currentHost && !isActiveOnHost ? 'opacity-40' : ''}
     `;
+
+    const hostBadge = isGlobal
+      ? '<span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">global</span>'
+      : `<span class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${isActiveOnHost ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}">`
+        + `<span class="w-1.5 h-1.5 rounded-full ${isActiveOnHost ? 'bg-green-500' : 'bg-gray-400'}"></span>`
+        + `${variable.hosts.length} host${variable.hosts.length !== 1 ? 's' : ''}</span>`;
+
+    const hostTooltip = !isGlobal && variable.hosts.length > 0
+      ? `title="${variable.hosts.map(h => escapeHtml(h)).join(', ')}"`
+      : '';
 
     item.innerHTML = `
       <div class="flex items-start justify-between gap-2">
@@ -87,6 +158,7 @@ function renderVariablesList(variables: Variable[]): void {
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
               ${escapeHtml(variable.key)}
             </span>
+            <span ${hostTooltip}>${hostBadge}</span>
             ${!variable.enabled ? '<span class="text-xs text-gray-400">(disabled)</span>' : ''}
           </div>
           <div class="flex items-center gap-2">
@@ -263,7 +335,12 @@ function setupEventListeners(): void {
     }
 
     try {
-      await storage.saveVariable({ key, value, enabled: true });
+      const quickAddHostCheckbox = document.getElementById('quick-add-host') as HTMLInputElement;
+      const hosts: string[] = [];
+      if (currentHost && quickAddHostCheckbox?.checked) {
+        hosts.push(currentHost);
+      }
+      await storage.saveVariable({ key, value, enabled: true, hosts });
       showToast('Variável adicionada.');
       closeQuickAddForm();
       await refreshData();
@@ -375,6 +452,7 @@ async function toggleVariable(id: string): Promise<void> {
 
 async function refreshData(): Promise<void> {
   currentVariables = await storage.getVariables();
+  renderHostIndicator(currentHost);
   renderVariablesList(currentVariables);
 }
 

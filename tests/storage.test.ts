@@ -4,10 +4,11 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StorageService, StorageError } from '../src/shared/storage';
+import { STORAGE_VERSION } from '../src/shared/constants';
 import type { Variable } from '../src/shared/types';
 
 // Mock chrome.storage API
-const mockStorage: Record<string, any> = {};
+let mockStorage: Record<string, any> = {};
 const mockListeners: Array<(changes: any, areaName: string) => void> = [];
 
 global.chrome = {
@@ -15,7 +16,7 @@ global.chrome = {
     local: {
       get: vi.fn((keys) => {
         if (keys === null) {
-          return Promise.resolve(mockStorage);
+          return Promise.resolve({ ...mockStorage });
         }
         const result: Record<string, any> = {};
         if (Array.isArray(keys)) {
@@ -42,13 +43,23 @@ global.chrome = {
   },
 } as any;
 
+/**
+ * Reset singleton instance between tests to avoid state leaks
+ */
+function resetStorageInstance(): void {
+  (StorageService as any).instance = undefined;
+}
+
 describe('StorageService', () => {
   let storage: StorageService;
 
   beforeEach(async () => {
-    // Clear mock storage
-    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+    // Clear mock storage completely
+    mockStorage = {};
     mockListeners.length = 0;
+
+    // Reset singleton to avoid state leaks between tests
+    resetStorageInstance();
 
     storage = StorageService.getInstance();
     await storage.initialize();
@@ -65,7 +76,7 @@ describe('StorageService', () => {
   describe('Initialization', () => {
     it('deve inicializar com dados padrão', async () => {
       const data = await storage.getData();
-      expect(data.version).toBe('1.0.0');
+      expect(data.version).toBe(STORAGE_VERSION);
       expect(data.variables).toEqual([]);
       expect(data.settings).toBeDefined();
     });
@@ -115,6 +126,9 @@ describe('StorageService', () => {
         key: 'UPDATE_TEST',
         value: 'initial_value',
       });
+
+      // Small delay to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 5));
 
       const updated = await storage.saveVariable({
         id: created.id,

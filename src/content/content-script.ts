@@ -5,6 +5,7 @@
 
 import { StorageService } from '@/shared/storage';
 import type { Settings, Variable } from '@/shared/types';
+import { filterVariablesByHost, formatHostDisplay } from '@/shared/host-utils';
 import { Autocomplete } from './autocomplete/autocomplete';
 import { detectAutocompletePattern, getAutocompleteFilter, getCaretPosition } from './autocomplete/input-tracker';
 import { detectAllEditors } from './detectors/editor-detector';
@@ -34,8 +35,13 @@ async function init(): Promise<void> {
     return;
   }
 
-  variablesCache = await storage.getVariables();
-  console.log('[Content Script] Loaded', variablesCache.length, 'variables');
+  const allVariables = await storage.getVariables();
+  const currentHostname = window.location.hostname;
+  const currentPort = window.location.port;
+  variablesCache = filterVariablesByHost(allVariables, currentHostname, currentPort);
+  console.log(
+    `[Content Script] Loaded ${allVariables.length} total, ${variablesCache.length} for host: ${formatHostDisplay(currentHostname, currentPort)}`
+  );
 
   // Detect page context
   const swaggerContext = detectSwaggerPage();
@@ -85,8 +91,15 @@ function setupStorageListener(): void {
 
 async function handleStorageChange(): Promise<void> {
   console.log('[Content Script] Storage changed, reloading...');
-  variablesCache = await storage.getVariables();
+  const allVariables = await storage.getVariables();
+  const currentHostname = window.location.hostname;
+  const currentPort = window.location.port;
+  variablesCache = filterVariablesByHost(allVariables, currentHostname, currentPort);
   settings = await storage.getSettings();
+
+  console.log(
+    `[Content Script] Reloaded ${allVariables.length} total, ${variablesCache.length} for host: ${formatHostDisplay(currentHostname, currentPort)}`
+  );
 
   // Update autocomplete
   if (autocomplete) {
