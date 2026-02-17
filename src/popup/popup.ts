@@ -15,6 +15,7 @@ let currentHost = '';
 let currentHostname = '';
 let currentPort = '';
 const showValues = false;
+let editingVariableId: string | null = null;
 
 async function init(): Promise<void> {
   console.log('[Popup] Initializing...');
@@ -151,49 +152,102 @@ function renderVariablesList(variables: Variable[]): void {
       ? `title="${variable.hosts.map(h => escapeHtml(h)).join(', ')}"`
       : '';
 
-    item.innerHTML = `
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-              ${escapeHtml(variable.key)}
-            </span>
-            <span ${hostTooltip}>${hostBadge}</span>
-            ${!variable.enabled ? '<span class="text-xs text-gray-400">(disabled)</span>' : ''}
+    const isEditing = editingVariableId === variable.id;
+
+    if (isEditing) {
+      item.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                ${escapeHtml(variable.key)}
+              </span>
+              <span ${hostTooltip}>${hostBadge}</span>
+            </div>
+            <textarea
+              class="edit-value-input w-full px-2 py-1.5 text-xs font-mono border border-blue-500 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y min-h-[60px] max-h-[120px]"
+              data-id="${variable.id}"
+              maxlength="${MAX_VARIABLE_VALUE_LENGTH}"
+              rows="2"
+            >${escapeHtml(variable.value)}</textarea>
+            <p class="edit-value-hint mt-1 text-xs text-gray-500 dark:text-gray-400">Enter = salvar · Esc = cancelar</p>
           </div>
-          <div class="flex items-center gap-2">
-            <code class="text-xs font-mono text-gray-700 dark:text-gray-300 truncate ${!showValues ? 'blur-sm group-hover:blur-none' : ''}">
-              ${escapeHtml(variable.value)}
-            </code>
+          <div class="flex flex-col gap-1">
+            <button
+              class="edit-value-save p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+              data-id="${variable.id}"
+              title="Salvar"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </button>
+            <button
+              class="edit-value-cancel p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              data-id="${variable.id}"
+              title="Cancelar"
+            >
+              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
           </div>
-          ${variable.description ? `
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
-              ${escapeHtml(variable.description)}
-            </p>
-          ` : ''}
         </div>
-        <div class="flex items-center gap-1">
-          <button
-            class="copy-btn p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors opacity-0 group-hover:opacity-100"
-            data-value="${escapeHtml(variable.value)}"
-            title="Copy value"
-          >
-            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-            </svg>
-          </button>
-          <button
-            class="toggle-var-btn p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            data-id="${variable.id}"
-            title="${variable.enabled ? 'Disable' : 'Enable'} variable"
-          >
-            <svg class="w-4 h-4 ${variable.enabled ? 'text-green-600' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${variable.enabled ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'}"></path>
-            </svg>
-          </button>
+      `;
+    } else {
+      item.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                ${escapeHtml(variable.key)}
+              </span>
+              <span ${hostTooltip}>${hostBadge}</span>
+              ${!variable.enabled ? '<span class="text-xs text-gray-400">(disabled)</span>' : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <code class="variable-value-display text-xs font-mono text-gray-700 dark:text-gray-300 truncate cursor-text ${!showValues ? 'blur-sm group-hover:blur-none' : ''}" data-id="${variable.id}" title="Clique para editar o valor">
+                ${escapeHtml(variable.value)}
+              </code>
+            </div>
+            ${variable.description ? `
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                ${escapeHtml(variable.description)}
+              </p>
+            ` : ''}
+          </div>
+          <div class="flex items-center gap-1">
+            <button
+              class="edit-value-btn p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors opacity-0 group-hover:opacity-100"
+              data-id="${variable.id}"
+              title="Editar valor"
+            >
+              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+            <button
+              class="copy-btn p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors opacity-0 group-hover:opacity-100"
+              data-value="${escapeHtml(variable.value)}"
+              title="Copy value"
+            >
+              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+              </svg>
+            </button>
+            <button
+              class="toggle-var-btn p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              data-id="${variable.id}"
+              title="${variable.enabled ? 'Disable' : 'Enable'} variable"
+            >
+              <svg class="w-4 h-4 ${variable.enabled ? 'text-green-600' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${variable.enabled ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'}"></path>
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     list.appendChild(item);
   });
@@ -218,6 +272,70 @@ function renderVariablesList(variables: Variable[]): void {
       await toggleVariable(id);
     });
   });
+
+  container.querySelectorAll('.edit-value-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id || '';
+      editingVariableId = id;
+      renderVariablesList(currentVariables);
+      setTimeout(() => {
+        const input = container.querySelector(`.edit-value-input[data-id="${id}"]`) as HTMLTextAreaElement;
+        input?.focus();
+      }, 0);
+    });
+  });
+
+  container.querySelectorAll('.variable-value-display').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = (el as HTMLElement).dataset.id || '';
+      editingVariableId = id;
+      renderVariablesList(currentVariables);
+      setTimeout(() => {
+        const input = container.querySelector(`.edit-value-input[data-id="${id}"]`) as HTMLTextAreaElement;
+        input?.focus();
+      }, 0);
+    });
+  });
+
+  container.querySelectorAll('.edit-value-input').forEach(textarea => {
+    const id = (textarea as HTMLElement).dataset.id || '';
+    (textarea as HTMLTextAreaElement).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        saveVariableValue(id, (textarea as HTMLTextAreaElement).value);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        editingVariableId = null;
+        renderVariablesList(currentVariables);
+      }
+    });
+  });
+
+  container.querySelectorAll('.edit-value-save').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id || '';
+      const input = container.querySelector(`.edit-value-input[data-id="${id}"]`) as HTMLTextAreaElement;
+      if (input) saveVariableValue(id, input.value);
+    });
+  });
+
+  container.querySelectorAll('.edit-value-cancel').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editingVariableId = null;
+      renderVariablesList(currentVariables);
+    });
+  });
+
+  // Focus edit input when in edit mode
+  if (editingVariableId) {
+    const input = container.querySelector(`.edit-value-input[data-id="${editingVariableId}"]`) as HTMLTextAreaElement;
+    if (input) setTimeout(() => input.focus(), 0);
+  }
 }
 
 function renderToggle(enabled: boolean): void {
@@ -448,6 +566,22 @@ async function toggleVariable(id: string): Promise<void> {
   variable.enabled = !variable.enabled;
   await storage.saveVariable(variable);
   await refreshData();
+}
+
+async function saveVariableValue(id: string, newValue: string): Promise<void> {
+  if (newValue.length > MAX_VARIABLE_VALUE_LENGTH) {
+    showToast(`Valor deve ter no máximo ${MAX_VARIABLE_VALUE_LENGTH} caracteres.`);
+    return;
+  }
+  const variable = currentVariables.find(v => v.id === id);
+  if (!variable) return;
+
+  editingVariableId = null;
+  variable.value = newValue;
+  variable.updatedAt = new Date().toISOString();
+  await storage.saveVariable(variable);
+  await refreshData();
+  showToast('Valor atualizado.');
 }
 
 async function refreshData(): Promise<void> {
