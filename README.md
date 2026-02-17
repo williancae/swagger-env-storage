@@ -1,251 +1,151 @@
 # Swagger Environment Variables
 
-Extensão de navegador para gerenciamento e substituição automática de variáveis de ambiente em formulários web, com suporte especial para Swagger UI.
-
-## 📋 Características
-
-- 🔄 Substituição automática de padrão `{{VARIAVEL}}` em campos de formulário
-- 💾 Armazenamento persistente de variáveis (chrome.storage.local)
-- 🎯 Suporte especial para Swagger UI (CodeMirror/Monaco editors)
-- ⚡ Interface rápida via popup e página de opções completa
-- 📦 Import/Export de variáveis em JSON
-- 🔐 Type-safe com TypeScript
-
-## 🛠️ Stack Tecnológica
-
-- **Manifest V3** - Padrão atual de extensões
-- **TypeScript** - Type safety e melhor DX
-- **Web Components** - Componentes nativos sem overhead de frameworks
-- **Vite** - Build ultrarrápido e HMR
-- **Tailwind CSS** - Utility-first CSS
-- **Vitest** - Testes unitários
-- **Playwright** - Testes E2E
-
-## 🚀 Desenvolvimento
-
-### Pré-requisitos
-
-- Node.js 18+
-- npm ou yarn
-
-### Instalação
-
-```bash
-# Instalar dependências
-npm install
-
-# Modo desenvolvimento (watch mode com hot reload)
-npm run dev
-
-# Build para produção (otimizado e minificado)
-npm run build
-
-# Testes
-npm test              # Unit tests
-npm run test:watch    # Unit tests em watch mode
-npm run test:e2e      # E2E tests com Playwright
-
-# Linting e formatação
-npm run lint          # Verificar código
-npm run lint:fix      # Corrigir automaticamente
-npm run format        # Formatar com Prettier
-npm run type-check    # Verificar tipos TypeScript
-```
-
-### Build System
-
-A extensão usa **Vite** com `vite-plugin-web-extension` para build otimizado:
-
-**Características**:
-- ⚡ Build rápido (<5s em modo dev)
-- 🔥 Hot Module Replacement (HMR)
-- 📦 Code splitting automático
-- 🗜️ Minificação com Terser
-- 📊 Bundle size: ~72KB (muito abaixo do target de 500KB)
-
-**Entry Points**:
-- `src/background/service-worker.ts` → Service Worker
-- `src/content/content-script.ts` → Content Script
-- `src/popup/popup.html` → Popup UI
-- `src/options/options.html` → Options Page
-
-**Output Structure** (`dist/`):
-```
-dist/
-├── manifest.json              # Manifest processado
-├── src/
-│   ├── background/
-│   │   └── service-worker.js  # ~11KB
-│   ├── content/
-│   │   └── content-script.js  # ~5KB
-│   ├── popup/
-│   │   └── popup.{html,js}    # ~1KB
-│   └── options/
-│       └── options.{html,js}  # ~4KB
-├── storage.js                 # Shared storage (~5KB)
-└── storage.css                # Tailwind CSS (~9KB)
-```
-
-### Carregar Extensão no Navegador
-
-**Importante:** Sempre carregue a extensão a partir da pasta **`dist/`** (após `npm run build` ou `npm run dev`). Nunca use a raiz do projeto: o `manifest.json` da raiz referencia arquivos `.ts`, que o Chrome não executa; só o manifest gerado em `dist/` referencia os `.js` compilados.
-
-#### Chrome/Edge
-
-1. Abrir `chrome://extensions`
-2. Habilitar "Developer mode" (canto superior direito)
-3. Clicar em "Load unpacked"
-4. **Selecionar a pasta `dist/`** do projeto (não a raiz)
-
-#### Firefox
-
-```bash
-# Auto-reload durante desenvolvimento
-npm run web-ext:run
-```
-
-Ou manualmente:
-1. Abrir `about:debugging#/runtime/this-firefox`
-2. Clicar "Load Temporary Add-on"
-3. Selecionar `dist/manifest.json`
-
-## 📁 Estrutura do Projeto
-
-```
-swagger_envs/
-├── src/
-│   ├── background/          # Service Worker
-│   ├── content/             # Content Scripts
-│   │   ├── detectors/       # Estratégias de detecção
-│   │   ├── replacers/       # Lógica de substituição
-│   │   └── observers/       # MutationObserver
-│   ├── popup/               # Interface popup
-│   ├── options/             # Página de opções
-│   ├── shared/              # Código compartilhado
-│   │   ├── storage.ts       # Abstração de storage
-│   │   ├── types.ts         # Interfaces TypeScript
-│   │   └── utils.ts         # Funções auxiliares
-│   └── styles/              # Estilos globais
-├── public/                  # Assets estáticos
-├── tests/                   # Testes
-├── dist/                    # Build output (gitignored)
-└── claudedocs/             # Documentação técnica
-```
-
-## 🎯 Como Usar
-
-### 1. Adicionar Variáveis
-
-1. Clique no ícone da extensão
-2. Acesse "Options" ou clique com botão direito → "Options"
-3. Adicione variáveis no formato key-value
-
-Exemplo:
-- Key: `API_KEY`
-- Value: `sk-1234567890abcdef`
-- Description: `Production API key`
-
-### 2. Usar em Formulários
-
-Digite o padrão `{{NOME_VARIAVEL}}` em qualquer campo:
-
-```
-{{API_KEY}}
-{{BASE_URL}}
-{{TOKEN}}
-```
-
-Ao sair do campo (blur), a variável será automaticamente substituída pelo valor correspondente.
-
-### 3. Atalho Manual
-
-Pressione `Ctrl+Shift+E` para forçar substituição imediata.
-
-### 4. Import/Export
-
-- **Export**: Baixe todas variáveis como JSON
-- **Import**: Carregue variáveis de arquivo JSON
-
-## 🔒 Segurança
-
-⚠️ **IMPORTANTE**: Variáveis são armazenadas **sem criptografia** em `chrome.storage.local`.
-
-**Recomendações**:
-- Não armazene dados extremamente sensíveis
-- Considere usar em ambientes de desenvolvimento/teste
-- Para produção, aguarde versão 2.0 com criptografia
-
-Ver [Documentação de Segurança](./claudedocs/architecture.md#6-segurança) para mais detalhes.
-
-## 📊 Performance
-
-- Content script load: < 50ms
-- Replacement latency: < 20ms
-- Bundle size total: < 500KB
-
-## 🧪 Testes
-
-### Unit Tests
-
-```bash
-npm test
-npm run test:watch
-```
-
-### E2E Tests
-
-```bash
-npm run test:e2e
-```
-
-### Manual Testing
-
-Ver [checklist de testes](./claudedocs/architecture.md#83-manual-testing-checklist)
-
-## 📚 Documentação
-
-- [Arquitetura Completa](./claudedocs/architecture.md)
-- [Guia de Desenvolvimento](./claudedocs/development-guide.md) _(em breve)_
-- [Referência de API](./claudedocs/api-reference.md) _(em breve)_
-
-## 🗺️ Roadmap
-
-### v1.0 (MVP) - Em Desenvolvimento
-- ✅ Storage local de variáveis
-- ✅ CRUD via Options Page
-- ✅ Popup básico
-- ✅ Substituição automática
-- ✅ Suporte Swagger UI
-- ✅ Import/Export JSON
-
-### v1.1 - Melhorias de UX
-- Dark mode
-- Autocomplete de variáveis
-- Search/filter
-- Feedback visual aprimorado
-
-### v2.0 - Features Avançadas
-- Grupos/ambientes (Dev/Staging/Prod)
-- Criptografia com master password
-- Histórico de mudanças
-- Sincronização cloud opcional
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie branch para feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para branch (`git push origin feature/nova-feature`)
-5. Abra Pull Request
-
-## 📄 Licença
-
-MIT License - ver [LICENSE](LICENSE) para detalhes
-
-## 👨‍💻 Autor
-
-**Seu Nome**
+<p align="center">
+  <img src="imgs/logo.png" alt="Logo Swagger Environment Variables" width="200">
+</p>
+
+<p align="center">
+  <strong>Otimize seu fluxo de trabalho de testes de API com gerenciamento inteligente de variáveis</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/williancae/swagger-env-vars">
+    <img src="https://img.shields.io/badge/versão-1.0.0-blue.svg" alt="Versão">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/licença-MIT-green.svg" alt="Licença">
+  </a>
+  <a href="https://www.typescriptlang.org/">
+    <img src="https://img.shields.io/badge/TypeScript-5.3-blue.svg" alt="TypeScript">
+  </a>
+</p>
+
+<p align="center">
+  <a href="README.EN.md">🇺🇸 Read in English</a>
+</p>
 
 ---
 
-**Desenvolvido com TypeScript + Vite + Web Components**
+## 🎯 O que é isso?
+
+Uma extensão de navegador que substitui automaticamente `{{variáveis}}` em formulários web pelos seus valores armazenados. Perfeita para testes de API no Swagger UI, mas funciona em qualquer lugar!
+
+Pare de copiar e colar tokens de autenticação, chaves de API e URLs manualmente. Apenas digite `{{nomeToken}}` e deixe a extensão fazer o resto.
+
+## ✨ Recursos Principais
+
+- 🔍 **Detecção Automática**: Encontra padrões `{{variável}}` automaticamente
+- ⚡ **Substituição Rápida**: Alt+Shift+R para substituir todas as variáveis instantaneamente
+- 💾 **Armazenamento Local**: Tudo fica na sua máquina
+- 🎨 **Autocomplete Inteligente**: Digite `{{` para ver suas variáveis
+- 🌐 **Multi-Host**: Organize variáveis por endpoint de API
+- 📤 **Importar/Exportar**: Faça backup e compartilhe configurações
+
+## 📸 Capturas de Tela
+
+### Popup de Acesso Rápido
+
+![Interface do Popup](imgs/pop_up.png)
+
+### Exemplo de Uso
+
+![Exemplo de Uso](imgs/exemplo_de_uso.png)
+
+### Painel Administrativo
+
+![Painel Admin](imgs/painel_adm.png)
+
+## 📦 Instalação
+
+### Chrome/Edge
+
+1. Baixe ou clone este repositório
+2. Execute `npm install && npm run build`
+3. Abra `chrome://extensions/`
+4. Ative o "Modo do desenvolvedor"
+5. Clique em "Carregar sem compactação" e selecione a pasta `dist/`
+
+### Firefox
+
+1. Baixe ou clone este repositório
+2. Execute `npm install && npm run build`
+3. Abra `about:debugging#/runtime/this-firefox`
+4. Clique em "Carregar extensão temporária"
+5. Selecione o `manifest.json` da pasta `dist/`
+
+> 📚 **Instruções detalhadas**: Veja o [Guia de Instalação](docs/ARCHITECTURE.md#installation)
+
+## 🚀 Início Rápido
+
+### 1. Adicionar uma Variável
+
+- Clique no ícone da extensão ou pressione `Alt+Shift+E`
+- Clique em "Adicionar Variável"
+- Digite um nome (ex: `authToken`) e valor (ex: `Bearer xyz...`)
+- Salve
+
+### 2. Usar Variáveis
+
+Digite `{{authToken}}` em qualquer campo de entrada e será substituído automaticamente!
+
+### Atalhos de Teclado
+
+| Atalho        | Ação                       |
+| ------------- | -------------------------- |
+| `Alt+Shift+E` | Abrir popup                |
+| `Alt+Shift+R` | Substituir todas variáveis |
+| `Alt+Shift+T` | Alternar extensão          |
+
+### Autocomplete
+
+1. Digite `{{` em qualquer campo
+2. Veja suas variáveis em um dropdown
+3. Use as setas para selecionar
+4. Pressione Enter para inserir
+
+## 📚 Documentação
+
+- 📖 [Guia de Contribuição](docs/CONTRIBUTING.pt-BR.md)
+- 🏗️ [Arquitetura & Desenvolvimento](docs/ARCHITECTURE.md)
+- 🔒 [Política de Segurança](docs/SECURITY.md)
+- 🗺️ [Roadmap](docs/ROADMAP.pt-BR.md)
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Confira nosso [Guia de Contribuição](docs/CONTRIBUTING.pt-BR.md) para começar.
+
+Links rápidos:
+
+- 🐛 [Reportar um Bug](https://github.com/williancae/swagger-env-vars/issues/new?template=bug_report.md)
+- 💡 [Sugerir um Recurso](https://github.com/williancae/swagger-env-vars/issues/new?template=feature_request.md)
+- 💬 [Discussões](https://github.com/williancae/swagger-env-vars/discussions)
+
+## ⚠️ Aviso de Segurança
+
+As variáveis são armazenadas **sem criptografia** no armazenamento local. Adequado para ambientes de dev/teste, mas evite armazenar credenciais de produção altamente sensíveis.
+
+A versão 2.0 incluirá criptografia com senha mestra. Veja a [Política de Segurança](docs/SECURITY.md) para detalhes.
+
+## 📄 Licença
+
+Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## ☕ Me Pague um Café
+
+Se esta extensão te ajudou, considere apoiar seu desenvolvimento!
+
+**PIX**: `williancaecam@gmail.com`
+
+Seu apoio ajuda a manter este projeto ativo e gratuito para todos. Obrigado! 🙏
+
+## 📞 Suporte
+
+- 🐛 **Issues**: [GitHub Issues](https://github.com/williancae/swagger-env-vars/issues)
+- 💬 **Discussões**: [GitHub Discussions](https://github.com/williancae/swagger-env-vars/discussions)
+- 📧 **Email**: <williancaecam@gmail.com>
+
+---
+
+<p align="center">
+  Feito com ❤️ por desenvolvedores, para desenvolvedores
+</p>
