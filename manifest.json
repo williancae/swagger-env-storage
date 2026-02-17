@@ -5,35 +5,28 @@
   "description": "Manage and auto-replace environment variables in web forms, with special support for Swagger UI",
   "author": "Your Name",
 
-  "permissions": [
-    "storage",
-    "activeTab",
-    "contextMenus"
-  ],
+  "permissions": ["storage", "activeTab", "contextMenus", "scripting"],
 
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "host_permissions": ["<all_urls>"],
 
   "commands": {
-    "open-popup": {
+    "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Shift+E",
-        "mac": "Command+Shift+E"
-      },
-      "description": "Abrir popup da extensão"
+        "default": "Alt+Shift+E",
+        "mac": "Alt+Shift+E"
+      }
     },
     "replace-variables": {
       "suggested_key": {
-        "default": "Ctrl+Shift+R",
-        "mac": "Command+Shift+R"
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
       },
       "description": "Substituir variáveis na página atual"
     },
     "toggle-extension": {
       "suggested_key": {
-        "default": "Ctrl+Shift+X",
-        "mac": "Command+Shift+X"
+        "default": "Alt+Shift+T",
+        "mac": "Alt+Shift+T"
       },
       "description": "Ativar/desativar extensão"
     }

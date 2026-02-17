@@ -307,25 +307,60 @@ function setupEventListeners(): void {
     }
   });
 
-  // Pending selection from Cmd+Shift+E or context menu "Nova variável"
-  chrome.runtime.sendMessage({ type: 'GET_PENDING_SELECTION' })
-    .then((response) => {
+  // Capture selection from active tab when popup opens
+  // Strategy: try content script first, fallback to pending selection from service worker
+  console.log('[Popup] Checking for text selection...');
+
+  const prefillSelection = (text: string): void => {
+    openQuickAddForm();
+    quickAddValue.value = text;
+    if (quickAddKey) quickAddKey.value = suggestVariableKey(text);
+    quickAddValue.classList.add('pre-filled');
+    setTimeout(() => quickAddValue.classList.remove('pre-filled'), 1500);
+    console.log('[Popup] Value pre-filled from selection');
+  };
+
+  const tryGetPendingSelection = async (): Promise<void> => {
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'GET_PENDING_SELECTION' });
       const text = response?.selection;
-      if (typeof text !== 'string' || !text.trim()) return;
+      if (typeof text === 'string' && text.trim()) {
+        console.log('[Popup] Pending selection found:', text);
+        prefillSelection(text.trim());
+      }
+    } catch (err) {
+      console.log('[Popup] Could not get pending selection:', err);
+    }
+  };
 
-      // Pre-fill value field and suggest key
-      openQuickAddForm();
-      quickAddValue.value = text;
-      if (quickAddKey) quickAddKey.value = suggestVariableKey(text);
+  chrome.tabs.query({ active: true, currentWindow: true })
+    .then(async ([tab]) => {
+      if (!tab?.id) {
+        console.log('[Popup] No active tab found, trying pending selection');
+        await tryGetPendingSelection();
+        return;
+      }
 
-      // Add visual feedback with fade-in animation
-      quickAddValue.classList.add('pre-filled');
-      setTimeout(() => quickAddValue.classList.remove('pre-filled'), 1500);
+      try {
+        // Try content script first (direct selection from page)
+        const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELECTION' });
+        const text = response?.selection;
 
-      console.log('[Popup] Value pre-filled from selection');
+        if (typeof text === 'string' && text.trim()) {
+          console.log('[Popup] Selection captured from content script');
+          prefillSelection(text.trim());
+        } else {
+          // No selection in content script, check pending selection from context menu
+          await tryGetPendingSelection();
+        }
+      } catch (err) {
+        // Content script not available (file://, chrome://, etc.)
+        console.log('[Popup] Content script not available, trying pending selection');
+        await tryGetPendingSelection();
+      }
     })
     .catch((err) => {
-      console.error('[Popup] Failed to get pending selection:', err);
+      console.error('[Popup] Failed to query active tab:', err);
     });
 }
 

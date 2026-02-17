@@ -44,13 +44,9 @@ export function validateVariableKey(key: string): boolean {
   return /^[a-zA-Z0-9_]+$/.test(key);
 }
 
-/** Shortcut label for opening popup: Ctrl+Shift+E on Windows/Linux, ⌘+Shift+E on Mac */
+/** Shortcut label for opening popup: Alt+Shift+E on all platforms */
 export function getOpenPopupShortcutLabel(): string {
-  const isMac =
-    typeof navigator !== 'undefined' &&
-    (/Mac|iPod|iPhone|iPad/.test(navigator.platform) ||
-      (navigator as Navigator & { userAgentData?: { platform: string } }).userAgentData?.platform === 'macOS');
-  return isMac ? '⌘+Shift+E' : 'Ctrl+Shift+E';
+  return 'Alt+Shift+E';
 }
 
 export function debounce<T extends (...args: any[]) => void>(

@@ -65,6 +65,7 @@ function setupStorageListener(): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_SELECTION') {
       const selection = window.getSelection()?.toString()?.trim() || null;
+      console.log('[Content Script] GET_SELECTION - returning:', selection ? `"${selection}"` : 'null');
       sendResponse({ selection });
       return true;
     }
@@ -137,16 +138,9 @@ function handleInput(event: Event): void {
   }
 }
 
-function handleKeydown(event: KeyboardEvent): void {
-  if (!settings) return;
-
-  // Manual replacement shortcut (Ctrl+Shift+R)
-  // Note: This is also handled by manifest commands via background service worker
-  if (event.ctrlKey && event.shiftKey && event.key === 'R') {
-    console.log('[Content Script] Manual replacement triggered');
-    event.preventDefault();
-    handleReplaceAll();
-  }
+function handleKeydown(_event: KeyboardEvent): void {
+  // Keyboard shortcuts are handled by manifest commands via the service worker.
+  // The service worker sends FORCE_REPLACE message which is handled in setupStorageListener.
 }
 
 function showAutocomplete(element: HTMLElement): void {
@@ -253,7 +247,11 @@ function scanAndProcessFields(): void {
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => init().catch((err) => {
+    console.error('[Content Script] init() failed:', err);
+  }));
 } else {
-  init();
+  init().catch((err) => {
+    console.error('[Content Script] init() failed:', err);
+  });
 }

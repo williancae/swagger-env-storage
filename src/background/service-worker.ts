@@ -174,25 +174,8 @@ chrome.commands.onCommand.addListener(async (command) => {
 
   try {
     switch (command) {
-      case 'open-popup': {
-        // Query active tab for selected text
-        let selection: string | null = null;
-        try {
-          const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELECTION' });
-          selection = response?.selection ?? null;
-        } catch {
-          // Tab without content script (e.g. chrome://, internal pages)
-          // Silently fail as expected
-        }
-
-        // Store selection temporarily if available
-        if (selection?.trim()) {
-          storePendingSelection(tab.id, selection.trim());
-        }
-
-        await chrome.action.openPopup();
-        break;
-      }
+      // _execute_action is now used for opening popup (doesn't fire onCommand)
+      // Selection capture moved to popup initialization
 
       case 'replace-variables':
         await chrome.tabs.sendMessage(tab.id, {
@@ -293,11 +276,24 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
 
     // Get pending selection for current tab
     case 'GET_PENDING_SELECTION': {
-      const tabId = sender.tab?.id;
+      // If sender is from popup (no tab), get the active tab
+      let tabId = sender.tab?.id;
+      console.log('[Service Worker] GET_PENDING_SELECTION - sender.tab?.id:', tabId);
+
       if (!tabId) {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        tabId = activeTab?.id;
+        console.log('[Service Worker] GET_PENDING_SELECTION - active tab id:', tabId);
+      }
+
+      if (!tabId) {
+        console.log('[Service Worker] GET_PENDING_SELECTION - no tab id, returning null');
         return { selection: null };
       }
-      return getPendingSelection(tabId);
+
+      const result = getPendingSelection(tabId);
+      console.log('[Service Worker] GET_PENDING_SELECTION - returning:', result);
+      return result;
     }
 
     default:

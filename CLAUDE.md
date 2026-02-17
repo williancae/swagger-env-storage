@@ -83,9 +83,9 @@ src/
 ```
 
 **Component Responsibilities:**
-- **Service Worker**: Event-driven lifecycle orchestrator (install/update handlers, 4-item context menu with separator, 3 keyboard shortcuts, message routing with 10+ message types)
-- **Content Script**: DOM manipulation (DOMObserver with 300ms debounce), variable detection/replacement, autocomplete UI integration, blur/input event delegation, visual feedback notifications
-- **Autocomplete**: Dropdown UI triggered by {{ pattern, keyboard navigation (ArrowDown/Up/Enter/Escape), case-insensitive filtering, absolute positioning at caret (z-index 10000)
+- **Service Worker**: Event-driven lifecycle orchestrator (install/update handlers, 4-item context menu with separator, 3 keyboard shortcuts, message routing with 10+ message types, pending selection storage with 30s timeout)
+- **Content Script**: DOM manipulation (DOMObserver with 300ms debounce), variable detection/replacement, autocomplete UI integration, blur/input event delegation, selection capture for popup pre-fill, visual feedback notifications
+- **Autocomplete**: Dropdown UI triggered by {{ pattern, keyboard navigation (ArrowDown/Up/Enter/Escape), case-insensitive filtering, position: fixed at viewport coordinates (z-index 10000)
 - **Detectors**: Editor detection strategies (CodeMirror, Monaco, ACE) with instance access
 - **Popup**: Quick access UI with Web Components (variable list, toggle)
 - **Options Page**: Full CRUD interface with Web Components (manager, form, import/export, settings)
@@ -118,7 +118,7 @@ src/
 - Prettier config: `.prettierrc` (JSON format)
   - singleQuote: true, semi: true, trailingComma: es5
   - printWidth: 100, tabWidth: 2, useTabs: false
-- PostCSS config: `postcss.config.js` (ES module format)
+- PostCSS config: `postcss.config.js` (ES module with export default)
   - plugins: tailwindcss, autoprefixer
 - Type safety: Chrome types (`@types/chrome`), Vite client types included
 
@@ -193,13 +193,16 @@ chrome.contextMenus.create({
   contexts: ['page']
 });
 
-// Click handler routes menu actions
+// Click handler routes menu actions and stores selections
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case 'replace-variables':
       await chrome.tabs.sendMessage(tab.id, { type: 'FORCE_REPLACE' });
       break;
     case 'add-variable':
+      if (info.selectionText?.trim()) {
+        storePendingSelection(tab.id, info.selectionText.trim());
+      }
       await chrome.action.openPopup();
       break;
     case 'open-settings':
@@ -212,7 +215,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 **Keyboard Shortcuts:**
 ```typescript
 // Defined in manifest.json, handled in service worker
-// - Ctrl+Shift+E (Cmd+Shift+E on Mac): Open popup
+// - Ctrl+Shift+E (Cmd+Shift+E on Mac): Open popup (with selection capture)
 // - Ctrl+Shift+R (Cmd+Shift+R on Mac): Replace variables
 // - Ctrl+Shift+X (Cmd+Shift+X on Mac): Toggle extension
 
@@ -221,6 +224,15 @@ chrome.commands.onCommand.addListener(async (command) => {
 
   switch (command) {
     case 'open-popup':
+      // Query active tab for selected text
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELECTION' });
+        if (response?.selection?.trim()) {
+          storePendingSelection(tab.id, response.selection.trim());
+        }
+      } catch (error) {
+        // Tab without content script (e.g. chrome://, internal pages)
+      }
       await chrome.action.openPopup();
       break;
     case 'replace-variables':
@@ -269,6 +281,7 @@ interface Settings {
   caseSensitive: boolean;
   replacementTrigger: 'onblur' | 'manual' | 'onsubmit';
   shortcutKey: string;
+  theme: ThemeMode;  // 'light' | 'dark' | 'system'
 }
 
 interface StorageData {
@@ -300,10 +313,12 @@ interface StorageData {
   - Settings: `GET_SETTINGS`, `UPDATE_SETTINGS`
   - Analytics: `VARIABLE_USED`, `GET_ANALYTICS`, `VARIABLES_DETECTED` (updates badge)
   - Data transfer: `EXPORT_DATA`, `IMPORT_DATA`
-  - Content script: `FORCE_REPLACE` (trigger replacement via keyboard shortcut)
+  - Content script: `FORCE_REPLACE` (trigger replacement), `GET_SELECTION` (capture selected text)
+  - Selection management: `GET_PENDING_SELECTION` (retrieve stored selection for popup pre-fill)
 - Storage change broadcasting: chrome.storage.onChanged listener notifies all tabs
 - Analytics tracking: In-memory cache (Map) for usage stats (count, lastUsed, urls)
-- Error handling: try-catch blocks, error responses with descriptive messages
+- Selection storage: In-memory Map (tab-specific) with 30s auto-cleanup timeout
+- Error handling: try-catch blocks, error responses with descriptive messages, silent failures for tabs without content script
 
 **Replacement Strategy:**
 - Default trigger: `onblur` event (configurable in settings)
@@ -350,11 +365,11 @@ interface StorageData {
 ```typescript
 // Trigger: User types {{ in input field
 class Autocomplete {
-  private dropdown: HTMLDivElement; // Positioned absolutely
+  private dropdown: HTMLDivElement; // Positioned with position: fixed
   private selectedIndex = 0;
   private filterText = '';
 
-  show(input, cursorX, cursorY): void; // Position dropdown at cursor
+  show(input, cursorX, cursorY): void; // Position dropdown at cursor viewport coordinates
   hide(): void;
   updateFilter(text): void;          // Filter variables as user types
 
@@ -364,11 +379,16 @@ class Autocomplete {
   // - Escape: Close dropdown
 }
 ```
-- Dropdown styling: absolute position, white bg, shadow, max-height 200px, z-index 10000
+- Dropdown styling: fixed position (viewport coordinates), white bg (#fff), rounded corners (8px), shadow (0 4px 20px rgba(0,0,0,0.12)), max-height 240px, z-index 10000, min-width 220px, max-width 320px
+- Border: 1px solid #e2e8f0 with additional box-shadow (0 0 0 1px rgba(0,0,0,0.04)) for depth
 - Filter logic: Case-insensitive includes on variable key
-- Selection highlight: Blue background (#007bff) for selected item
-- Click handlers: Insert variable on item click
+- Selection highlight: Light blue background (#eff6ff) with dark blue text (#1e40af) for selected item, smooth transition (0.1s ease)
+- Click handlers: Insert variable on item click, mouseenter updates selection
+- Item styling: 8px vertical padding, 12px horizontal padding, border-bottom separator (#f1f5f9, last-child has none)
+- Font: System fonts (-apple-system, BlinkMacSystemFont, Segoe UI, Roboto), 13px size, 11px for descriptions (#64748b)
+- Empty state: Centered text (#94a3b8) with 12px padding when no matches
 - Position adjustment: Prevents overflow bottom/right of viewport
+- ARIA attributes: role="listbox", aria-label="Variáveis de ambiente"
 
 **Input Tracking:**
 ```typescript
@@ -377,10 +397,14 @@ detectAutocompletePattern(element): boolean;  // Returns true if last 2 chars ar
 getAutocompleteFilter(element): string;       // Gets text between {{ and cursor
 getCaretPosition(element): CaretPosition | null; // Returns { x, y, element }
 ```
-- `CaretPosition`: Pixel coordinates for dropdown positioning
-- Single-line inputs: Position below input (rect.bottom + scrollTop)
+- `CaretPosition`: Viewport pixel coordinates for fixed-position dropdown (x, y, element)
+- Single-line inputs: Position below input (rect.bottom for y, rect.left for x using getBoundingClientRect)
 - Textareas: Mirror element technique to measure exact cursor position
-- Mirror element: Copies textarea styles, measures text before cursor with temporary span
+  - Create invisible mirror div with copied textarea styles
+  - Insert text before cursor + temporary span with '|'
+  - Measure span.getBoundingClientRect() for exact cursor viewport position
+  - Remove mirror after measurement
+- Mirror element: Copies all relevant textarea styles (font, padding, line-height, etc.), measures text before cursor, returns spanRect.left and spanRect.bottom as viewport coordinates
 
 **Utility Functions:**
 - `generateId()`: UUID generation via crypto.randomUUID()

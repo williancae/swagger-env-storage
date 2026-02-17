@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = {
   enabled: true,
   caseSensitive: false,
   replacementTrigger: 'onblur' as const,
-  shortcutKey: 'Ctrl+Shift+E',
+  shortcutKey: 'Alt+Shift+E',
   theme: 'light' as const,
 };
 

@@ -88,12 +88,14 @@ dist/
 
 ### Carregar Extensão no Navegador
 
+**Importante:** Sempre carregue a extensão a partir da pasta **`dist/`** (após `npm run build` ou `npm run dev`). Nunca use a raiz do projeto: o `manifest.json` da raiz referencia arquivos `.ts`, que o Chrome não executa; só o manifest gerado em `dist/` referencia os `.js` compilados.
+
 #### Chrome/Edge
 
 1. Abrir `chrome://extensions`
 2. Habilitar "Developer mode" (canto superior direito)
 3. Clicar em "Load unpacked"
-4. Selecionar pasta `dist/`
+4. **Selecionar a pasta `dist/`** do projeto (não a raiz)
 
 #### Firefox
 
