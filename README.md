@@ -1,7 +1,7 @@
 # Swagger Environment Variables
 
 <p align="center">
-  <img src="imgs/logo.png" alt="Logo Swagger Environment Variables" width="200">
+  <img src="imgs/logo.png" style="width: 40%; height: auto;"  alt="Logo Swagger Environment Variables" width="200">
 </p>
 
 <p align="center">
