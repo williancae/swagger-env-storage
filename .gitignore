@@ -41,3 +41,6 @@ test-results/
 
 # Auto-memory / editor state
 .claude/
+
+# Documentação interna (claudedocs)
+claudedocs/
